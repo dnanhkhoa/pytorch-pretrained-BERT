@@ -19,6 +19,7 @@ from __future__ import absolute_import, division, print_function
 import collections
 import logging
 import os
+import re
 import unicodedata
 from glob import glob
 
@@ -406,33 +407,60 @@ def _is_punctuation(char):
 
 
 class SentencePieceTokenizer(object):
-    def __init__(self, model_file, do_lower_case=False):
+    def __init__(
+        self,
+        model_file,
+        do_lower_case=False,
+        wordpiece_mode=False,
+        unk_token="[unk]",
+    ):
         assert os.path.isfile(model_file), "Model file not found."
+
         self.spm = spm.SentencePieceProcessor()
         self.spm.load(model_file)
+
         self.do_lower_case = do_lower_case
+        self.wordpiece_mode = wordpiece_mode
+
+        self.unk_token = unk_token
+        self.unk_token_id = self.spm.PieceToId(self.unk_token)
+        self.unused_token_id = self.spm.PieceToId("[unused]")
+
+        self.wordpiece_pattern = re.compile(
+            r"\S*" + re.escape(self.unk_token) + r"\S*"
+        )
+
+    def __correct_unk_id(self, _id):
+        if _id == self.unused_token_id:
+            return self.unk_token_id
+        return _id
 
     def encode_as_pieces(self, sentence):
-        if self.do_lower_case:
-            sentence = sentence.lower()
-        return list(map(self.id_to_piece, self.encode_as_ids(sentence)))
+        return self.decode_ids(self.encode_as_ids(sentence))
 
     def encode_as_ids(self, sentence):
         if self.do_lower_case:
             sentence = sentence.lower()
-        return self.spm.EncodeAsIds(sentence)
+        return self.spm.EncodeAsIds(
+            self.decode_ids(self.spm.EncodeAsIds(sentence))
+        )
 
     def decode_pieces(self, pieces):
-        return "".join(pieces).lstrip("▁").replace("▁", " ")
+        return self.decode_ids(map(self.piece_to_id, pieces))
 
     def decode_ids(self, ids):
-        return self.decode_pieces(map(self.id_to_piece, ids))
+        sentence = self.spm.DecodeIds(map(self.__correct_unk_id, ids))
+        if self.wordpiece_mode:
+            return self.wordpiece_pattern.sub(self.unk_token, sentence)
+        return sentence
 
     def id_to_piece(self, _id):
-        return self.spm.IdToPiece(_id)
+        return self.spm.IdToPiece(self.__correct_unk_id(_id))
 
     def piece_to_id(self, piece):
-        return self.spm.PieceToId(piece)
+        if self.do_lower_case:
+            piece = piece.lower()
+        return self.__correct_unk_id(self.spm.PieceToId(piece))
 
     def __sizeof__(self):
         return self.spm.GetPieceSize()
@@ -441,16 +469,19 @@ class SentencePieceTokenizer(object):
 if __name__ == "__main__":
     # Train SentencePiece
     corpus_file_or_dir = (
-        "/media/files/dnanhkhoa/projects/workspace/single_pubmed_baseline.txt"
+        "/media/files/dnanhkhoa/projects/workspace/corpora/pubmed_baseline.txt"
     )
     model_file = "pubmed_baseline"
     vocab_size = 32000
     # * https://github.com/google/sentencepiece/issues/9#issuecomment-289352218
     input_sentence_size = 9_000_000
     character_coverage = 1.0
+
     model_method = "unigram"
-    user_defined_symbols = ",".join(
-        ["[pad]", "[sep]", "[cls]", "[mask]"]
+
+    unk_token = "[unk]"
+    user_defined_tokens = ",".join(
+        [unk_token, "[pad]", "[sep]", "[cls]", "[mask]"]
     )  # ! Should be in lowercase
 
     corpus_files = None
@@ -470,7 +501,7 @@ if __name__ == "__main__":
         f"--vocab_size={vocab_size} --character_coverage={character_coverage} "
         f"--model_type={model_method} "
         f"--bos_id=-1 --eos_id=-1 --pad_id=-1 "
-        f"--unk_id=0 --unk_piece=[unk] "
-        f"--user_defined_symbols={user_defined_symbols} "
+        f"--unk_id=0 --unk_piece=[unused] --unk_surface={unk_token} "
+        f"--user_defined_symbols={user_defined_tokens} "
         f"--input_sentence_size={input_sentence_size}"
     )
