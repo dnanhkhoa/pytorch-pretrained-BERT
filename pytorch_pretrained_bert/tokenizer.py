@@ -436,7 +436,9 @@ class SentencePieceTokenizer(object):
         return _id
 
     def encode_as_pieces(self, sentence):
-        return self.decode_ids(self.encode_as_ids(sentence))
+        return self.spm.EncodeAsPieces(
+            self.decode_ids(self.encode_as_ids(sentence))
+        )
 
     def encode_as_ids(self, sentence):
         if self.do_lower_case:
@@ -449,7 +451,7 @@ class SentencePieceTokenizer(object):
         return self.decode_ids(map(self.piece_to_id, pieces))
 
     def decode_ids(self, ids):
-        sentence = self.spm.DecodeIds(map(self.__correct_unk_id, ids))
+        sentence = self.spm.DecodeIds(list(map(self.__correct_unk_id, ids)))
         if self.wordpiece_mode:
             return self.wordpiece_pattern.sub(self.unk_token, sentence)
         return sentence
