@@ -558,10 +558,11 @@ def main():
     args = parser.parse_args(
         args=[
             "--bert_model=models/bert-base-cased",
-            "--train_file=samples/sample_text.txt",
+            "--train_file=samples/small_wiki_corpus.txt",
             "--output_dir=results",
             "--train_batch_size=16",
             "--fp16",
+            "--loss_scale=128",
             "--do_train",
         ]
     )
