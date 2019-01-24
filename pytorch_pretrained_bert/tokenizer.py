@@ -79,52 +79,40 @@ class BertTokenizer(object):
 
     def __init__(
         self,
-        vocab_file=None,
+        vocab_file,
         do_lower_case=True,
-        max_len=512,
+        max_len=None,
         never_split=("[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]"),
-        sentencepiece=None,
     ):
+        if not os.path.isfile(vocab_file):
+            raise ValueError(
+                "Can't find a vocabulary file at path '{}'. To load the vocabulary from a Google pretrained "
+                "model use `tokenizer = BertTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`".format(
+                    vocab_file
+                )
+            )
+        self.vocab = load_vocab(vocab_file)
+        self.ids_to_tokens = collections.OrderedDict(
+            [(ids, tok) for tok, ids in self.vocab.items()]
+        )
         self.basic_tokenizer = BasicTokenizer(
             do_lower_case=do_lower_case, never_split=never_split
         )
+        self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab)
         self.max_len = max_len if max_len is not None else int(1e12)
-
-        self.sentencepiece = sentencepiece
-
-        if not self.sentencepiece:
-            assert os.path.isfile(
-                vocab_file
-            ), f"Can't find a vocabulary file at path '{vocab_file}'. "
-            "To load the vocabulary from a Google pretrained model use "
-            "`tokenizer = BertTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
-
-            self.vocab = load_vocab(vocab_file)
-            self.ids_to_tokens = collections.OrderedDict(
-                [(ids, tok) for tok, ids in self.vocab.items()]
-            )
-            self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab)
 
     def tokenize(self, text):
         split_tokens = []
         for token in self.basic_tokenizer.tokenize(text):
-            if self.sentencepiece:
-                for sub_token in self.sentencepiece.encode_as_pieces(token):
-                    split_tokens.append(sub_token)
-            else:
-                for sub_token in self.wordpiece_tokenizer.tokenize(token):
-                    split_tokens.append(sub_token)
+            for sub_token in self.wordpiece_tokenizer.tokenize(token):
+                split_tokens.append(sub_token)
         return split_tokens
 
     def convert_tokens_to_ids(self, tokens):
         """Converts a sequence of tokens into ids using the vocab."""
         ids = []
         for token in tokens:
-            if self.sentencepiece:
-                ids.append(self.sentencepiece.piece_to_id(token))
-            else:
-                ids.append(self.vocab[token])
-
+            ids.append(self.vocab[token])
         if len(ids) > self.max_len:
             raise ValueError(
                 "Token indices sequence length is longer than the specified maximum "
@@ -139,10 +127,7 @@ class BertTokenizer(object):
         """Converts a sequence of ids in wordpiece tokens using the vocab."""
         tokens = []
         for i in ids:
-            if self.sentencepiece:
-                tokens.append(self.sentencepiece.id_to_piece(i))
-            else:
-                tokens.append(self.ids_to_tokens[i])
+            tokens.append(self.ids_to_tokens[i])
         return tokens
 
     @classmethod
