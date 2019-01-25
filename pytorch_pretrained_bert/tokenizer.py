@@ -407,24 +407,17 @@ def _is_punctuation(char):
 
 
 class SentencePieceTokenizer(object):
-    def __init__(
-        self,
-        model_file,
-        do_lower_case=False,
-        wordpiece_mode=False,
-        unk_token="[unk]",
-    ):
+    def __init__(self, model_file, wordpiece_mode=False, unk_token="[UNK]"):
         assert os.path.isfile(model_file), "Model file not found."
 
         self.spm = spm.SentencePieceProcessor()
         self.spm.load(model_file)
 
-        self.do_lower_case = do_lower_case
         self.wordpiece_mode = wordpiece_mode
 
         self.unk_token = unk_token
         self.unk_token_id = self.spm.PieceToId(self.unk_token)
-        self.unused_token_id = self.spm.PieceToId("[unused]")
+        self.unused_token_id = self.spm.PieceToId("[UNUSED]")
 
         self.wordpiece_pattern = re.compile(
             r"\S*" + re.escape(self.unk_token) + r"\S*"
@@ -441,8 +434,6 @@ class SentencePieceTokenizer(object):
         )
 
     def encode_as_ids(self, sentence):
-        if self.do_lower_case:
-            sentence = sentence.lower()
         return self.spm.EncodeAsIds(
             self.decode_ids(self.spm.EncodeAsIds(sentence))
         )
@@ -460,8 +451,6 @@ class SentencePieceTokenizer(object):
         return self.spm.IdToPiece(self.__correct_unk_id(_id))
 
     def piece_to_id(self, piece):
-        if self.do_lower_case:
-            piece = piece.lower()
         return self.__correct_unk_id(self.spm.PieceToId(piece))
 
     def __sizeof__(self):
@@ -481,9 +470,9 @@ if __name__ == "__main__":
 
     model_method = "unigram"
 
-    unk_token = "[unk]"
+    unk_token = "[UNK]"
     user_defined_tokens = ",".join(
-        [unk_token, "[pad]", "[sep]", "[cls]", "[mask]"]
+        [unk_token, "[PAD]", "[SEP]", "[CLS]", "[MASK]"]
     )  # ! Should be in lowercase
 
     corpus_files = None
@@ -503,7 +492,7 @@ if __name__ == "__main__":
         f"--vocab_size={vocab_size} --character_coverage={character_coverage} "
         f"--model_type={model_method} "
         f"--bos_id=-1 --eos_id=-1 --pad_id=-1 "
-        f"--unk_id=0 --unk_piece=[unused] --unk_surface={unk_token} "
+        f"--unk_id=0 --unk_piece=[UNUSED] --unk_surface={unk_token} "
         f"--user_defined_symbols={user_defined_tokens} "
         f"--input_sentence_size={input_sentence_size}"
     )
