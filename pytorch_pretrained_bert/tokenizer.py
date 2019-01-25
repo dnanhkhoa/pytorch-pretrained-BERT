@@ -81,6 +81,7 @@ class BertTokenizer(object):
         self,
         vocab_file,
         do_lower_case=True,
+        sentencepiece=None,
         max_len=None,
         never_split=("[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]"),
     ):
@@ -98,7 +99,9 @@ class BertTokenizer(object):
         self.basic_tokenizer = BasicTokenizer(
             do_lower_case=do_lower_case, never_split=never_split
         )
-        self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab)
+        self.wordpiece_tokenizer = sentencepiece or WordpieceTokenizer(
+            vocab=self.vocab
+        )
         self.max_len = max_len if max_len is not None else int(1e12)
 
     def tokenize(self, text):
